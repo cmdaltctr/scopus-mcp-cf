@@ -14,9 +14,10 @@ import {
  * Validates the Bearer token from the Authorization header.
  * Accepts either OWNER_API_KEY or TEAM_API_KEY.
  * Also requires the user's Scopus API key via X-Scopus-Api-Key header.
- * Returns a Response (error) or null (OK) + attaches key to request context.
+ * Optionally accepts X-ELS-InstToken for institutional IP bypass.
+ * Returns a Response (error) or null (OK) + attaches data to request context.
  */
-const SCOPUS_KEY_CTX = "__scopusApiKey";
+const CTX_PREFIX = "__scopus_";
 
 function authenticate(request: Request, env: Env): Response | null {
   const authHeader = request.headers.get("Authorization");
@@ -39,15 +40,19 @@ function authenticate(request: Request, env: Env): Response | null {
   if (!scopusKey) {
     return new Response("X-Scopus-Api-Key header is required", { status: 400 });
   }
-  (request as any)[SCOPUS_KEY_CTX] = scopusKey;
+  (request as any)[CTX_PREFIX + "apiKey"] = scopusKey;
+
+  // Optionally extract InstToken for institutional IP bypass
+  const instToken = request.headers.get("X-ELS-InstToken") || null;
+  (request as any)[CTX_PREFIX + "instToken"] = instToken;
 
   return null; // Auth OK
 }
 
 // ─── MCP Server Factory ────────────────────────────────────────────
 
-function createServer(scopusKey: string): McpServer {
-  const client = new ScopusClient(scopusKey);
+function createServer(scopusKey: string, instToken?: string | null): McpServer {
+  const client = new ScopusClient(scopusKey, instToken);
   const server = new McpServer({
     name: "Scopus MCP",
     version: "0.1.0",
@@ -223,8 +228,9 @@ export default {
       const authError = authenticate(request, env);
       if (authError) return authError;
 
-      const scopusKey = (request as any)[SCOPUS_KEY_CTX];
-      const server = createServer(scopusKey);
+      const scopusKey = (request as any)[CTX_PREFIX + "apiKey"];
+      const instToken = (request as any)[CTX_PREFIX + "instToken"];
+      const server = createServer(scopusKey, instToken);
       return createMcpHandler(server)(request, env, ctx);
     }
 

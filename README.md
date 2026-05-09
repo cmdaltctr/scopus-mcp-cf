@@ -88,10 +88,27 @@ Restart Claude Desktop, then try:
 
 ### What each header does
 
-| Header               | Value                                         |
-| -------------------- | --------------------------------------------- |
-| `Authorization`        | `Bearer <token>` — proves you're allowed to use this MCP server |
-| `X-Scopus-Api-Key`     | Your personal Elsevier Scopus API key — authenticates searches |
+| Header               | Required? | Value                                         |
+| -------------------- | --------- | --------------------------------------------- |
+| `Authorization`        | ✅ Yes      | `Bearer <token>` — proves you're allowed to use this MCP server |
+| `X-Scopus-Api-Key`     | ✅ Yes      | Your personal Elsevier Scopus API key — authenticates searches |
+| `X-ELS-InstToken`      | ⬜ No       | Your institutional token for remote IP access (see below) |
+
+### If you're outside your institution's network
+
+Elsevier's Scopus API identifies your institutional affiliation by your **IP address**. If your API key was created through your university, direct requests from a deployed Cloudflare Worker may fail because the Worker's IP isn't recognized.
+
+**Solution:** Add your **InstToken** (Institutional Token) as an extra header. Get one by emailing **integrationsupport@elsevier.com** with your API key and institution name, or ask your institution's library. Once you have it:
+
+```json
+{
+  "headers": {
+    "Authorization": "Bearer <your-token>",
+    "X-Scopus-Api-Key": "<your-scopus-key>",
+    "X-ELS-InstToken": "<your-insttoken>"
+  }
+}
+```
 
 ---
 
@@ -167,6 +184,18 @@ Click **Connect**, then **List Tools** — you should see all 5 tools.
   "headers": {
     "Authorization": "Bearer <TEAM_API_KEY>",
     "X-Scopus-Api-Key": "<their-scopus-api-key>"
+  }
+}
+```
+
+### With InstToken (if outside institutional network)
+```json
+{
+  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
+  "headers": {
+    "Authorization": "Bearer <your-token>",
+    "X-Scopus-Api-Key": "<your-scopus-api-key>",
+    "X-ELS-InstToken": "<your-insttoken-from-elsevier>"
   }
 }
 ```

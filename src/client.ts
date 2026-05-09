@@ -6,11 +6,13 @@
  */
 export class ScopusClient {
   private apiKey: string;
+  private instToken: string | null;
   private baseUrl = "https://api.elsevier.com";
   private quotaInfo: Record<string, unknown> = {};
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, instToken?: string | null) {
     this.apiKey = apiKey;
+    this.instToken = instToken ?? null;
   }
 
   /**
@@ -28,13 +30,16 @@ export class ScopusClient {
       }
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        "X-ELS-APIKey": this.apiKey,
-        Accept: "application/json",
-        "User-Agent": "ScopusMCP-CF/0.1.0",
-      },
-    });
+    const headers: Record<string, string> = {
+      "X-ELS-APIKey": this.apiKey,
+      Accept: "application/json",
+    };
+    // Forward InstToken if provided — allows access from non-institutional IPs
+    if (this.instToken) {
+      headers["X-ELS-InstToken"] = this.instToken;
+    }
+
+    const response = await fetch(url.toString(), { headers });
 
     // Track rate-limit headers for getQuotaStatus
     this.quotaInfo = {
@@ -45,6 +50,9 @@ export class ScopusClient {
     };
 
     if (!response.ok) {
+      // Read the response body for debugging
+      let body = "";
+      try { body = await response.text(); } catch {}
       switch (response.status) {
         case 401:
           throw new Error("Authentication failed: Invalid Scopus API Key");
@@ -53,7 +61,7 @@ export class ScopusClient {
         case 429:
           throw new Error("Rate limit exceeded. Please wait and try again.");
         default:
-          throw new Error(`Scopus API error: ${response.status} ${response.statusText}`);
+          throw new Error(`Scopus API error: ${response.status} ${response.statusText} — ${body.slice(0, 200)}`);
       }
     }
 
