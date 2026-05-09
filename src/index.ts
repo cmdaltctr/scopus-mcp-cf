@@ -13,7 +13,7 @@ import {
 /**
  * Validates the Bearer token from the Authorization header.
  * Accepts either OWNER_API_KEY or TEAM_API_KEY.
- * Also extracts the user's Scopus API key from X-Scopus-Api-Key header.
+ * Also requires the user's Scopus API key via X-Scopus-Api-Key header.
  * Returns a Response (error) or null (OK) + attaches key to request context.
  */
 const SCOPUS_KEY_CTX = "__scopusApiKey";
@@ -34,8 +34,11 @@ function authenticate(request: Request, env: Env): Response | null {
     return new Response("Forbidden", { status: 403 });
   }
 
-  // Attach the Scopus API key to request context for tool handlers
-  const scopusKey = request.headers.get("X-Scopus-Api-Key") || env.SCOPUS_API_KEY;
+  // Require the user's own Scopus API key via header (no fallback)
+  const scopusKey = request.headers.get("X-Scopus-Api-Key");
+  if (!scopusKey) {
+    return new Response("X-Scopus-Api-Key header is required", { status: 400 });
+  }
   (request as any)[SCOPUS_KEY_CTX] = scopusKey;
 
   return null; // Auth OK
@@ -220,7 +223,7 @@ export default {
       const authError = authenticate(request, env);
       if (authError) return authError;
 
-      const scopusKey = (request as any)[SCOPUS_KEY_CTX] || env.SCOPUS_API_KEY;
+      const scopusKey = (request as any)[SCOPUS_KEY_CTX];
       const server = createServer(scopusKey);
       return createMcpHandler(server)(request, env, ctx);
     }

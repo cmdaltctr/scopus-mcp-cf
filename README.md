@@ -100,7 +100,7 @@ Restart Claude Desktop, then try:
 ### Prerequisites
 
 - A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- An [Elsevier Scopus API key](https://dev.elsevier.com/) (free with institutional access) — this serves as a fallback default
+- An [Elsevier Scopus API key](https://dev.elsevier.com/) (free with institutional access)
 - Node.js installed on your computer
 
 ### Step 1 — Authenticate with Cloudflare
@@ -114,9 +114,6 @@ This opens a browser — log in to your Cloudflare account and grant access.
 ### Step 2 — Set your secrets
 
 ```bash
-# A default Scopus API key (fallback if user doesn't provide their own)
-echo "your-scopus-api-key-here" | npx wrangler secret put SCOPUS_API_KEY
-
 # Your personal bearer token (generate with openssl)
 openssl rand -base64 32 | npx wrangler secret put OWNER_API_KEY
 
@@ -125,6 +122,8 @@ openssl rand -base64 32 | npx wrangler secret put TEAM_API_KEY
 ```
 
 The `OWNER_API_KEY` and `TEAM_API_KEY` are just random strings — they're how your MCP server identifies authorized users. They're separate from Scopus entirely.
+
+> There is no shared `SCOPUS_API_KEY`. Every user (including you) passes their own Scopus API key via the `X-Scopus-Api-Key` header in their MCP client config.
 
 ### Step 3 — Deploy
 
