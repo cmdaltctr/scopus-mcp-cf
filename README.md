@@ -2,7 +2,7 @@
 
 A remote [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets you search academic papers on Scopus using AI assistants like Claude.
 
-**No installation needed.** Your AI assistant talks to this server over the internet — no Python, no `uv`, no local setup.
+**No Python, no `uv`, no local installation.** Your AI assistant talks to this server over the internet.
 
 ---
 
@@ -13,7 +13,7 @@ You ask Claude (or any AI)    ──►    This Cloudflare Worker    ──►  
 to find papers on a topic            searches Scopus for you          returns results
 ```
 
-The worker runs on Cloudflare's edge network. You connect to it from Claude Desktop, Cursor, or any MCP client using a simple web address.
+The worker runs on Cloudflare's edge network. Anyone with the server URL, their own Scopus API key, and an access token can use it from any MCP client (Claude Desktop, Cursor, etc.).
 
 ---
 
@@ -41,45 +41,57 @@ The worker runs on Cloudflare's edge network. You connect to it from Claude Desk
 
 ---
 
-## Security
+## Security — Two Keys, Two Purposes
 
-This server uses **Bearer token authentication**. You need a secret token to connect.
+This server uses **two separate keys** for two different security layers:
 
-- **Owner key** — for you (the person who deployed this)
-- **Team key** — a shared key for colleagues (can be changed at any time)
+| What                    | Purpose                                              | Who provides it               |
+| ----------------------- | ---------------------------------------------------- | ----------------------------- |
+| **Bearer token** (access) | Proves you're allowed to use this MCP server        | The **admin** gives this to you |
+| **Scopus API key** (usage) | Authenticates each search with Elsevier's API       | **You** bring your own key     |
 
-If a key is compromised or a colleague leaves, you can generate a new one and the old one stops working instantly.
+**The bearer token unlocks the door. Your Scopus API key runs the search.**
+
+If a colleague leaves or a token is compromised, the admin generates a new one and the old one stops working instantly — no redeploy needed.
+
+You get your own Scopus API key free from [Elsevier Developer Portal](https://dev.elsevier.com/).
 
 ---
 
 ## Quick Start (for users)
 
-If someone has already deployed this server and given you a token:
+You need three things from the person who deployed this server:
+1. The **server URL**
+2. A **bearer token** (your access key)
+3. Your own **Scopus API key** (get it from [Elsevier](https://dev.elsevier.com/))
 
-1. Open your Claude Desktop settings → Developer → Edit Config
-2. Add this to your `claude_desktop_config.json`:
+### Configure Claude Desktop
+
+Open Settings → Developer → Edit Config and add:
 
 ```json
 {
   "mcpServers": {
     "scopus": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp"
-      ],
+      "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
       "headers": {
-        "Authorization": "Bearer <your-token-here>"
+        "Authorization": "Bearer <bearer-token-from-admin>",
+        "X-Scopus-Api-Key": "<your-own-scopus-api-key>"
       }
     }
   }
 }
 ```
 
-3. Restart Claude Desktop
-4. Try asking: *"Search for papers on machine learning in healthcare from 2024"*
+Restart Claude Desktop, then try:
+> *"Search for papers on machine learning in healthcare from 2024"*
 
-> **Note:** `npx` comes with Node.js. If you don't have Node, install it first from [nodejs.org](https://nodejs.org/).
+### What each header does
+
+| Header               | Value                                         |
+| -------------------- | --------------------------------------------- |
+| `Authorization`        | `Bearer <token>` — proves you're allowed to use this MCP server |
+| `X-Scopus-Api-Key`     | Your personal Elsevier Scopus API key — authenticates searches |
 
 ---
 
@@ -88,7 +100,7 @@ If someone has already deployed this server and given you a token:
 ### Prerequisites
 
 - A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- An [Elsevier Scopus API key](https://dev.elsevier.com/) (free with institutional access)
+- An [Elsevier Scopus API key](https://dev.elsevier.com/) (free with institutional access) — this serves as a fallback default
 - Node.js installed on your computer
 
 ### Step 1 — Authenticate with Cloudflare
@@ -102,17 +114,17 @@ This opens a browser — log in to your Cloudflare account and grant access.
 ### Step 2 — Set your secrets
 
 ```bash
-# Your Elsevier Scopus API key
+# A default Scopus API key (fallback if user doesn't provide their own)
 echo "your-scopus-api-key-here" | npx wrangler secret put SCOPUS_API_KEY
 
-# Your personal auth token (generate one)
+# Your personal bearer token (generate with openssl)
 openssl rand -base64 32 | npx wrangler secret put OWNER_API_KEY
 
-# Shared token for colleagues (generate another)
+# Shared bearer token for colleagues
 openssl rand -base64 32 | npx wrangler secret put TEAM_API_KEY
 ```
 
-Come up with your own tokens instead of using "owner" or "team" as values. The `openssl rand -base64 32` command generates a secure random string.
+The `OWNER_API_KEY` and `TEAM_API_KEY` are just random strings — they're how your MCP server identifies authorized users. They're separate from Scopus entirely.
 
 ### Step 3 — Deploy
 
@@ -120,10 +132,7 @@ Come up with your own tokens instead of using "owner" or "team" as values. The `
 npm run deploy
 ```
 
-Your server will be live at:
-`https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp`
-
-Find your account name in the Cloudflare dashboard URL — it's the part after `dash.cloudflare.com/`.
+Your server will be live at `https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp`
 
 ### Step 4 — Test it
 
@@ -131,35 +140,58 @@ Find your account name in the Cloudflare dashboard URL — it's the part after `
 npx @modelcontextprotocol/inspector@latest
 ```
 
-In the inspector, enter your deployed URL and set the header:
-`Authorization: Bearer <your-owner-token>`
+In the inspector, enter your deployed URL and set these headers:
+- `Authorization: Bearer <your-owner-token>`
+- `X-Scopus-Api-Key: <your-scopus-api-key>`
 
 Click **Connect**, then **List Tools** — you should see all 5 tools.
+
+---
+
+## Quick Config Reference
+
+### You (the admin) — uses your own key
+```json
+{
+  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
+  "headers": {
+    "Authorization": "Bearer <OWNER_API_KEY>",
+    "X-Scopus-Api-Key": "<your-scopus-api-key>"
+  }
+}
+```
+
+### A colleague — uses their own key
+```json
+{
+  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
+  "headers": {
+    "Authorization": "Bearer <TEAM_API_KEY>",
+    "X-Scopus-Api-Key": "<their-scopus-api-key>"
+  }
+}
+```
+
+---
+
+## Changing the Team Key
+
+```bash
+openssl rand -base64 32                    # Generate new key
+echo "new-key-here" | npx wrangler secret put TEAM_API_KEY   # Update instantly
+```
+
+The old key stops working immediately — no redeploy needed.
 
 ---
 
 ## Local Development
 
 ```bash
-# Start the dev server
-npm start
-
-# It runs at http://localhost:8787
+npm start            # Dev server at http://localhost:8787
 ```
 
 The `.env` file has your local secrets (this file is gitignored — never commit it).
-
-## Changing the Team Key
-
-```bash
-# Generate a new key
-openssl rand -base64 32
-
-# Update it instantly (no redeploy needed)
-npx wrangler secret put TEAM_API_KEY
-```
-
-The old key stops working immediately — every request is checked against the current secret.
 
 ---
 
@@ -167,21 +199,21 @@ The old key stops working immediately — every request is checked against the c
 
 ```
 src/
-├── index.ts     — Entry point: auth middleware + tool definitions + prompts
+├── index.ts     — Entry point: auth middleware + 5 tools + 2 prompts
 ├── client.ts    — Makes HTTP calls to the Elsevier Scopus API
 ├── utils.ts     — Cleans up raw API responses into neat JSON
-└── env.d.ts     — TypeScript type definitions for environment variables
+└── env.d.ts     — TypeScript type definitions
 ```
 
 ---
 
 ## Tech Stack
 
-- **Runtime:** Cloudflare Workers (JavaScript/TypeScript)
+- **Runtime:** Cloudflare Workers
 - **MCP Framework:** `@modelcontextprotocol/sdk` + `agents` (Cloudflare)
 - **Validation:** `zod`
-- **Deployment:** Wrangler CLI
 - **Auth:** Bearer token (checked on every request, no sessions)
+- **Deployment:** Wrangler CLI
 
 ---
 

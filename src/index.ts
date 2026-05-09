@@ -13,8 +13,11 @@ import {
 /**
  * Validates the Bearer token from the Authorization header.
  * Accepts either OWNER_API_KEY or TEAM_API_KEY.
- * Returns a Response (error) or null (OK).
+ * Also extracts the user's Scopus API key from X-Scopus-Api-Key header.
+ * Returns a Response (error) or null (OK) + attaches key to request context.
  */
+const SCOPUS_KEY_CTX = "__scopusApiKey";
+
 function authenticate(request: Request, env: Env): Response | null {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -31,13 +34,17 @@ function authenticate(request: Request, env: Env): Response | null {
     return new Response("Forbidden", { status: 403 });
   }
 
+  // Attach the Scopus API key to request context for tool handlers
+  const scopusKey = request.headers.get("X-Scopus-Api-Key") || env.SCOPUS_API_KEY;
+  (request as any)[SCOPUS_KEY_CTX] = scopusKey;
+
   return null; // Auth OK
 }
 
 // ─── MCP Server Factory ────────────────────────────────────────────
 
-function createServer(env: Env): McpServer {
-  const client = new ScopusClient(env.SCOPUS_API_KEY);
+function createServer(scopusKey: string): McpServer {
+  const client = new ScopusClient(scopusKey);
   const server = new McpServer({
     name: "Scopus MCP",
     version: "0.1.0",
@@ -213,7 +220,8 @@ export default {
       const authError = authenticate(request, env);
       if (authError) return authError;
 
-      const server = createServer(env);
+      const scopusKey = (request as any)[SCOPUS_KEY_CTX] || env.SCOPUS_API_KEY;
+      const server = createServer(scopusKey);
       return createMcpHandler(server)(request, env, ctx);
     }
 
