@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "cf-typegen": "wrangler types",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "local": "npx tsx src/local.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.16.0",
@@ -15,6 +16,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/node": "^25.6.2",
+    "tsx": "^4.0.0",
     "typescript": "^5.8.3",
     "wrangler": "^4.0.0"
   }

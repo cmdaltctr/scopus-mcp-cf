@@ -1,8 +1,8 @@
 # Scopus MCP — Cloudflare Worker
 
-A remote [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets you search academic papers on Scopus using AI assistants like Claude.
+A **remote MCP server** for searching academic papers on Scopus, deployed on Cloudflare Workers. Also works locally via stdio.
 
-**No Python, no `uv`, no local installation.** Your AI assistant talks to this server over the internet.
+Ported from [cmdaltctr/scopus-mcp](https://github.com/cmdaltctr/scopus-mcp).
 
 ---
 
@@ -27,6 +27,8 @@ The worker runs on Cloudflare's edge network. Anyone with the server URL, their 
 
 ## Features
 
+### Tools (5 tools)
+
 | Tool                  | What it does                                                                 |
 | --------------------- | ---------------------------------------------------------------------------- |
 | `search_scopus`         | Search for papers using Scopus query syntax (e.g., `TITLE(AI) AND PUBYEAR > 2023`) |
@@ -35,9 +37,12 @@ The worker runs on Cloudflare's edge network. Anyone with the server URL, their 
 | `get_citing_papers`     | Find all papers that cited a specific paper (forward citation search)        |
 | `get_quota_status`      | Check how many Scopus API requests you have left                             |
 
-**Prompts** (pre-built conversation starters):
-- `research-summary` — Guides the AI to search a topic and summarize findings
-- `author-analysis` — Guides the AI to pull up an author's profile and analyze their impact
+### Prompts (2 prompts)
+
+| Prompt             | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `research-summary`  | Guides the AI to search a topic and summarize findings     |
+| `author-analysis`   | Guides the AI to pull up an author's profile and analyze their impact |
 
 ---
 
@@ -112,6 +117,203 @@ Elsevier's Scopus API identifies your institutional affiliation by your **IP add
 
 ---
 
+## 🚀 Running on Cloudflare (Remote)
+
+### Authentication
+
+#### Layer 1 — Bearer Token (Server Gate)
+
+Set these as Cloudflare Worker secrets:
+
+```bash
+wrangler secret put OWNER_API_KEY   # Your personal token
+wrangler secret put TEAM_API_KEY    # Shared token for colleagues
+```
+
+Generate keys with `openssl rand -base64 32`.
+
+#### Layer 2 — Per-User Scopus API Key
+
+Every user (including you) passes their own Scopus API key via the `X-Scopus-Api-Key` header. There is **no shared server-side Scopus key**.
+
+### Client Configuration
+
+**You (owner):**
+```json
+{
+  "scopus": {
+    "command": "npx",
+    "args": [
+      "mcp-remote",
+      "https://scopus-mcp-cf.<your-account>.workers.dev/mcp",
+      "--header",
+      "Authorization:Bearer <YOUR_OWNER_API_KEY>",
+      "--header",
+      "X-Scopus-Api-Key:<your-scopus-key>"
+    ]
+  }
+}
+```
+
+**Colleagues (team):**
+```json
+{
+  "scopus": {
+    "command": "npx",
+    "args": [
+      "mcp-remote",
+      "https://scopus-mcp-cf.<your-account>.workers.dev/mcp",
+      "--header",
+      "Authorization:Bearer <SHARED_TEAM_API_KEY>",
+      "--header",
+      "X-Scopus-Api-Key:<their-own-scopus-key>"
+    ]
+  }
+}
+```
+
+### With InstToken
+```json
+{
+  "scopus": {
+    "command": "npx",
+    "args": [
+      "mcp-remote",
+      "https://scopus-mcp-cf.<your-account>.workers.dev/mcp",
+      "--header",
+      "Authorization:Bearer <your-token>",
+      "--header",
+      "X-Scopus-Api-Key:<your-scopus-key>",
+      "--header",
+      "X-ELS-InstToken:<your-insttoken>"
+    ]
+  }
+}
+```
+
+### Deploy
+
+```bash
+# 1. Set secrets
+wrangler secret put OWNER_API_KEY
+wrangler secret put TEAM_API_KEY
+
+# 2. Deploy
+npm run deploy
+```
+
+---
+
+## 💻 Running Locally (Stdio)
+
+No Cloudflare account needed. Runs on any machine with Node.js.
+
+```bash
+# 1. Clone
+git clone https://github.com/cmdaltctr/scopus-mcp-cf.git
+cd scopus-mcp-cf
+
+# 2. Install
+npm install
+
+# 3. Run
+SCOPUS_API_KEY=your-key npm run local
+```
+
+The `SCOPUS_API_KEY` is required (your Elsevier Scopus API key). Optionally set `SCOPUS_INST_TOKEN` if you need institutional IP bypass.
+
+Then configure in your MCP client:
+
+```json
+{
+  "scopus": {
+    "command": "npx",
+    "args": ["tsx", "src/local.ts"],
+    "env": {
+      "SCOPUS_API_KEY": "your-scopus-api-key"
+    }
+  }
+}
+```
+
+### For OpenCode users:
+
+Add to `~/.config/opencode/opencode.json` or project-level `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "scopus": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "src/local.ts"],
+      "env": {
+        "SCOPUS_API_KEY": "your-scopus-api-key"
+      }
+    }
+  }
+}
+```
+
+---
+
+## For Your AI - One-Click Setup Prompt
+
+Copy the entire block below and paste it to your AI coding agent (Claude, OpenCode, Cursor, etc.). The AI will handle everything automatically.
+
+> **Instructions**: Replace `<path-to-project>` with the folder where you want it installed (e.g., `~/projects` or `C:\Users\You\projects`).
+
+---
+
+```
+You are installing the scopus-mcp-cf project. This is an MCP server that searches academic papers on Scopus (Elsevier's research database) using 5 tools.
+
+INSTALLATION DIRECTORY: <path-to-project>/scopus-mcp-cf
+
+STEPS:
+1. Clone the repo: git clone https://github.com/cmdaltctr/scopus-mcp-cf.git <path-to-project>/scopus-mcp-cf
+2. cd into the directory
+3. Run: npm install
+4. Run: npx tsc --noEmit  (verify type check passes)
+5. Run: SCOPUS_API_KEY=demo npm run local
+   (kill it after 3 seconds to confirm it starts)
+
+After installation, configure the MCP client. For OpenCode, add to opencode.json:
+{
+  "mcp": {
+    "scopus": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "src/local.ts"],
+      "env": {
+        "SCOPUS_API_KEY": "<your-scopus-api-key>"
+      }
+    }
+  }
+}
+
+For Claude Desktop or Cursor, add to their MCP config:
+{
+  "scopus": {
+    "command": "npx",
+    "args": ["tsx", "src/local.ts"],
+    "env": {
+      "SCOPUS_API_KEY": "<your-scopus-api-key>"
+    }
+  }
+}
+
+To test it works, ask the user to try: "search for papers about machine learning in healthcare using the search_scopus tool"
+
+NOTES:
+- No Cloudflare account needed for local setup
+- SCOPUS_API_KEY is required (get one free at https://dev.elsevier.com/)
+- Optionally set SCOPUS_INST_TOKEN if your institution requires it
+- All 5 tools + 2 prompts will be available after restarting the MCP client
+```
+
+---
+
 ## Deployment Guide (for admins)
 
 ### Prerequisites
@@ -138,10 +340,6 @@ openssl rand -base64 32 | npx wrangler secret put OWNER_API_KEY
 openssl rand -base64 32 | npx wrangler secret put TEAM_API_KEY
 ```
 
-The `OWNER_API_KEY` and `TEAM_API_KEY` are just random strings — they're how your MCP server identifies authorized users. They're separate from Scopus entirely.
-
-> There is no shared `SCOPUS_API_KEY`. Every user (including you) passes their own Scopus API key via the `X-Scopus-Api-Key` header in their MCP client config.
-
 ### Step 3 — Deploy
 
 ```bash
@@ -162,47 +360,7 @@ In the inspector, enter your deployed URL and set these headers:
 
 Click **Connect**, then **List Tools** — you should see all 5 tools.
 
----
-
-## Quick Config Reference
-
-### You (the admin) — uses your own key
-```json
-{
-  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
-  "headers": {
-    "Authorization": "Bearer <OWNER_API_KEY>",
-    "X-Scopus-Api-Key": "<your-scopus-api-key>"
-  }
-}
-```
-
-### A colleague — uses their own key
-```json
-{
-  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
-  "headers": {
-    "Authorization": "Bearer <TEAM_API_KEY>",
-    "X-Scopus-Api-Key": "<their-scopus-api-key>"
-  }
-}
-```
-
-### With InstToken (if outside institutional network)
-```json
-{
-  "url": "https://scopus-mcp-cf.YOUR_ACCOUNT.workers.dev/mcp",
-  "headers": {
-    "Authorization": "Bearer <your-token>",
-    "X-Scopus-Api-Key": "<your-scopus-api-key>",
-    "X-ELS-InstToken": "<your-insttoken-from-elsevier>"
-  }
-}
-```
-
----
-
-## Changing the Team Key
+### Changing the Team Key
 
 ```bash
 openssl rand -base64 32                    # Generate new key
@@ -213,37 +371,72 @@ The old key stops working immediately — no redeploy needed.
 
 ---
 
-## Local Development
+## Development
 
 ```bash
-npm start            # Dev server at http://localhost:8787
+# Install dependencies
+npm install
+
+# Start local stdio server (standalone, no Cloudflare)
+SCOPUS_API_KEY=your-key npm run local
+
+# Start Cloudflare dev server (requires .env with OWNER_API_KEY and TEAM_API_KEY)
+npm run dev
+
+# Deploy to Cloudflare
+npm run deploy
+
+# Type check
+npm run type-check
+
+# Test with MCP Inspector
+npx @modelcontextprotocol/inspector
 ```
-
-The `.env` file has your local secrets (this file is gitignored — never commit it).
-
----
 
 ## Project Structure
 
 ```
 src/
-├── index.ts     — Entry point: auth middleware + 5 tools + 2 prompts
+├── index.ts     — Entry point: auth middleware + creates MCP handler
+├── server.ts    — MCP server factory: all 5 tools + 2 prompts (zero CF deps)
+├── local.ts     — Stdio entry point for local running
 ├── client.ts    — Makes HTTP calls to the Elsevier Scopus API
 ├── utils.ts     — Cleans up raw API responses into neat JSON
-└── env.d.ts     — TypeScript type definitions
+├── types.ts     — Shared types (ScopusAuthContext)
+└── env.d.ts     — Cloudflare Worker environment types
 ```
-
----
 
 ## Tech Stack
 
-- **Runtime:** Cloudflare Workers
+- **Runtime:** Cloudflare Workers (remote) / Node.js (local)
 - **MCP Framework:** `@modelcontextprotocol/sdk` + `agents` (Cloudflare)
 - **Validation:** `zod`
 - **Auth:** Bearer token (checked on every request, no sessions)
 - **Deployment:** Wrangler CLI
 
----
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  MCP Client     │────▶│  Cloudflare      │────▶│  Scopus API     │
+│  (Claude, etc.) │     │  Worker          │     │  (Elsevier)     │
+│  Bearer + Key   │     │  createMcpHandler │     │                 │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                              │
+                         ┌────┴────┐
+                         │  Auth   │
+                         │ Bearer  │
+                         │ Check   │
+                         └─────────┘
+
+Or locally via stdio:
+
+┌─────────────────┐     ┌──────────────────┐
+│  MCP Client     │────▶│  StdioServer      │
+│  (stdio config) │     │  Transport       │
+│                 │     │  src/local.ts    │
+└─────────────────┘     └──────────────────┘
+```
 
 ## Related
 
