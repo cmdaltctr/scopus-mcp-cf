@@ -222,21 +222,59 @@ SCOPUS_API_KEY=your-key npm run local
 
 The `SCOPUS_API_KEY` is required (your Elsevier Scopus API key). Optionally set `SCOPUS_INST_TOKEN` if you need institutional IP bypass.
 
-Then configure in your MCP client:
+### MCP Client Configuration
+
+After cloning, configure your MCP client using the **absolute path** to the repo (replace `/path/to/scopus-mcp-cf` below):
+
+#### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
-  "scopus": {
-    "command": "npx",
-    "args": ["tsx", "src/local.ts"],
-    "env": {
-      "SCOPUS_API_KEY": "your-scopus-api-key"
+  "mcpServers": {
+    "scopus": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/scopus-mcp-cf/src/local.ts"],
+      "env": {
+        "SCOPUS_API_KEY": "your-scopus-api-key"
+      }
     }
   }
 }
 ```
 
-### For OpenCode users:
+#### Claude Code (CLI)
+
+Add to your project or global config:
+
+```bash
+# Project-level
+claude mcp add scopus -- npx tsx /path/to/scopus-mcp-cf/src/local.ts
+claude mcp set scopus --env SCOPUS_API_KEY=your-scopus-api-key
+
+# Or global (user-level)
+claude mcp add --scope user scopus -- npx tsx /path/to/scopus-mcp-cf/src/local.ts
+claude mcp set --scope user scopus --env SCOPUS_API_KEY=your-scopus-api-key
+```
+
+Or add directly to `.claude/settings.json` or `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "scopus": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/scopus-mcp-cf/src/local.ts"],
+      "env": {
+        "SCOPUS_API_KEY": "your-scopus-api-key"
+      }
+    }
+  }
+}
+```
+
+#### OpenCode
 
 Add to `~/.config/opencode/opencode.json` or project-level `opencode.json`:
 
@@ -246,10 +284,26 @@ Add to `~/.config/opencode/opencode.json` or project-level `opencode.json`:
     "scopus": {
       "type": "stdio",
       "command": "npx",
-      "args": ["tsx", "src/local.ts"],
+      "args": ["tsx", "/path/to/scopus-mcp-cf/src/local.ts"],
       "env": {
         "SCOPUS_API_KEY": "your-scopus-api-key"
       }
+    }
+  }
+}
+```
+
+#### Cursor / Other MCP Clients
+
+Use the same stdio pattern:
+
+```json
+{
+  "scopus": {
+    "command": "npx",
+    "args": ["tsx", "/path/to/scopus-mcp-cf/src/local.ts"],
+    "env": {
+      "SCOPUS_API_KEY": "your-scopus-api-key"
     }
   }
 }
@@ -278,27 +332,31 @@ STEPS:
 5. Run: SCOPUS_API_KEY=demo npm run local
    (kill it after 3 seconds to confirm it starts)
 
-After installation, configure the MCP client. For OpenCode, add to opencode.json:
+After installation, configure the MCP client. Use the ABSOLUTE path to src/local.ts:
+
+For Claude Desktop (edit claude_desktop_config.json):
+{
+  "mcpServers": {
+    "scopus": {
+      "command": "npx",
+      "args": ["tsx", "ABSOLUTE_PATH/src/local.ts"],
+      "env": { "SCOPUS_API_KEY": "<your-scopus-api-key>" }
+    }
+  }
+}
+
+For Claude Code (run in terminal):
+claude mcp add scopus -- npx tsx ABSOLUTE_PATH/src/local.ts
+claude mcp set scopus --env SCOPUS_API_KEY=<your-scopus-api-key>
+
+For OpenCode (edit opencode.json):
 {
   "mcp": {
     "scopus": {
       "type": "stdio",
       "command": "npx",
-      "args": ["tsx", "src/local.ts"],
-      "env": {
-        "SCOPUS_API_KEY": "<your-scopus-api-key>"
-      }
-    }
-  }
-}
-
-For Claude Desktop or Cursor, add to their MCP config:
-{
-  "scopus": {
-    "command": "npx",
-    "args": ["tsx", "src/local.ts"],
-    "env": {
-      "SCOPUS_API_KEY": "<your-scopus-api-key>"
+      "args": ["tsx", "ABSOLUTE_PATH/src/local.ts"],
+      "env": { "SCOPUS_API_KEY": "<your-scopus-api-key>" }
     }
   }
 }

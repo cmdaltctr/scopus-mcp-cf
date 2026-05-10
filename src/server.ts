@@ -54,8 +54,8 @@ export function createServer(auth: ScopusAuthContext): McpServer {
         .number()
         .min(1)
         .max(25)
-        .default(5)
-        .describe("Number of results to return (default 5, max 25)."),
+        .default(25)
+        .describe("Number of results to return (default 25, max 25)."),
       sort: z
         .string()
         .default("coverDate")
@@ -114,8 +114,8 @@ export function createServer(auth: ScopusAuthContext): McpServer {
         .number()
         .min(1)
         .max(25)
-        .default(5)
-        .describe("Number of results to return (default 5, max 25)."),
+        .default(25)
+        .describe("Number of results to return (default 25, max 25)."),
       sort: z
         .string()
         .default("coverDate")
