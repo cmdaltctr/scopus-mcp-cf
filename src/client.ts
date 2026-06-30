@@ -50,7 +50,7 @@ export class ScopusClient {
     };
 
     if (!response.ok) {
-      // Read the response body for debugging
+      // Read the response body for server-side logging only (never surfaced to MCP client)
       let body = "";
       try { body = await response.text(); } catch {}
       switch (response.status) {
@@ -61,7 +61,10 @@ export class ScopusClient {
         case 429:
           throw new Error("Rate limit exceeded. Please wait and try again.");
         default:
-          throw new Error(`Scopus API error: ${response.status} ${response.statusText} — ${body.slice(0, 200)}`);
+          // S-001: log full context server-side (CF observability / local stderr),
+          // throw a generic message so upstream Scopus bodies can't leak to clients.
+          console.error(`Scopus ${response.status} ${response.statusText}: ${body.slice(0, 200)}`);
+          throw new Error(`Scopus API error: ${response.status} ${response.statusText}`);
       }
     }
 

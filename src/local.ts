@@ -23,6 +23,8 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  // S-004: log only the message — full Error objects may pick up sensitive
+  // context as the code evolves, and stderr is captured by MCP clients.
+  console.error("Fatal error:", (err as Error).message ?? String(err));
   process.exit(1);
 });
