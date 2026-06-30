@@ -2,9 +2,17 @@ import { createMcpHandler } from "agents/mcp";
 import type { ScopusAuthContext } from "./types";
 import { createServer } from "./server";
 
-const CTX_PREFIX = "__scopus_";
-
-function authenticate(request: Request, env: Env): Response | null {
+/**
+ * Authenticate the incoming request and extract the Scopus credentials.
+ *
+ * Returns a `Response` (error) or a `ScopusAuthContext` (success). The caller
+ * distinguishes the two with `instanceof Response`. No request mutation.
+ *
+ * Credentials are per-user, supplied via headers — same shape as local mode:
+ *   - `X-Scopus-Api-Key`  — required, the caller's own Elsevier API key
+ *   - `X-ELS-InstToken`   — optional, only set when institutional IP bypass is needed
+ */
+function authenticate(request: Request, env: Env): Response | ScopusAuthContext {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return new Response("Unauthorized", {
@@ -20,23 +28,13 @@ function authenticate(request: Request, env: Env): Response | null {
     return new Response("Forbidden", { status: 403 });
   }
 
-  const scopusKey = request.headers.get("X-Scopus-Api-Key");
-  if (!scopusKey) {
+  const apiKey = request.headers.get("X-Scopus-Api-Key");
+  if (!apiKey) {
     return new Response("X-Scopus-Api-Key header is required", { status: 400 });
   }
-  (request as any)[CTX_PREFIX + "apiKey"] = scopusKey;
 
   const instToken = request.headers.get("X-ELS-InstToken") || null;
-  (request as any)[CTX_PREFIX + "instToken"] = instToken;
-
-  return null;
-}
-
-function getAuthContext(request: Request): ScopusAuthContext {
-  return {
-    apiKey: (request as any)[CTX_PREFIX + "apiKey"] ?? "",
-    instToken: (request as any)[CTX_PREFIX + "instToken"] ?? null,
-  };
+  return { apiKey, instToken };
 }
 
 export default {
@@ -44,11 +42,10 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/mcp") {
-      const authError = authenticate(request, env);
-      if (authError) return authError;
+      const result = authenticate(request, env);
+      if (result instanceof Response) return result;
 
-      const auth = getAuthContext(request);
-      const server = createServer(auth);
+      const server = createServer(result);
       return createMcpHandler(server)(request, env, ctx);
     }
 
