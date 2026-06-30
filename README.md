@@ -309,6 +309,23 @@ Use the same stdio pattern:
 }
 ```
 
+#### Adding Institutional IP Bypass (Optional)
+
+If your Scopus API key is tied to a university or research institution, Elsevier identifies your entitlements by IP address. Requests from outside your institution's network (home wifi, cloud VMs) may be rejected or return partial results.
+
+The fix is an **InstToken** (Institutional Token) — request one from **integrationsupport@elsevier.com** with your API key and institution name.
+
+Add `SCOPUS_INST_TOKEN` to the `env` block of any local config above:
+
+```json
+"env": {
+  "SCOPUS_API_KEY": "your-scopus-api-key",
+  "SCOPUS_INST_TOKEN": "your-insttoken-from-elsevier"
+}
+```
+
+The token is attached to every outbound Scopus request as the `X-ELS-InstToken` header. It never leaves your machine — local stdio is server-side from Elsevier's perspective, and the only network hop is HTTPS to `api.elsevier.com`. Don't commit the token to git.
+
 ---
 
 ## For Your AI - One-Click Setup Prompt
